@@ -31,7 +31,10 @@ public class StrengthValidator {
         return strength != null ? strength.getScore() : null;
     }
     public boolean isInputSanitized (String aInput, String aPattern) {
-        Pattern pattern = Pattern.compile(aPattern, Pattern.CASE_INSENSITIVE);
+        if(aInput==null )
+            return false;
+        Pattern pattern = Pattern.compile((aPattern!=null)? aPattern : DEFAULT_SANITIZED_PATTERN, Pattern.CASE_INSENSITIVE);
+
         Matcher matcher = pattern.matcher(aInput);
         return matcher.matches(); //true only if entire region sequence matches the pattern
     }
@@ -39,7 +42,7 @@ public class StrengthValidator {
     // Consider a weak password's level < WEAK_PASSWORD_LEVEL
     public boolean validatePassword(String aPassword, String aPattern) {
         int pwScore = getPasswordScore(aPassword);
-        return pwScore >= WEAK_PASSWORD_LEVEL && isInputSanitized(aPassword, ((aPattern == null || aPattern.isEmpty()) ? DEFAULT_SANITIZED_PATTERN : aPattern));
+        return pwScore >= WEAK_PASSWORD_LEVEL && isInputSanitized(aPassword, (aPattern));
     }
     public HashMap<String, List<String>> getPasswordFeedback(String aPassword) {
         HashMap<String, List<String>> feedbackHM = new HashMap<>();

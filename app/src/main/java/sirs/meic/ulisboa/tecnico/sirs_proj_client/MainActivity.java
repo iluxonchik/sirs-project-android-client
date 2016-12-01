@@ -7,6 +7,8 @@ import android.widget.Button;
 import android.widget.EditText;
 
 // Common Package
+import java.io.Console;
+
 import sirs.meic.ulisboa.tecnico.common.StrengthValidator;
 
 public class MainActivity extends AppCompatActivity {
@@ -32,11 +34,10 @@ public class MainActivity extends AppCompatActivity {
     public void signUp(View view) {
         String pwPattern = "[a-z][a-z0-9_-\\.]*";
         if(userEditText.getText().toString().isEmpty() || !validator.isInputSanitized(userEditText.getText().toString(), null)) {
-            // TODO - Alert the user that the username mustn't
-            finish();
+            // TODO - Alert the user that the username mustn'
         }
         else if (pwEditText.getText().toString().isEmpty() || !validator.validatePassword(pwEditText.getText().toString(), null)){
-            // TODO - Alert the user that the username mustn't
+            // TODO - Alert the user that the username mustnt
             // TODO - Update a progress bar according to Score to show how weak the password is
             finish();
         }
@@ -44,6 +45,4 @@ public class MainActivity extends AppCompatActivity {
 
         }
     }
-
-
 }
