@@ -29,6 +29,8 @@ public class MainActivity extends AppCompatActivity {
         userEditText = (EditText)findViewById(R.id.userEditText);
 
         validator = new StrengthValidator();
+
+        System.out.println("============================ " + System.getProperty("user.dir") + " ==============================");
     }
 
     public void signUp(View view) {
@@ -39,7 +41,7 @@ public class MainActivity extends AppCompatActivity {
         else if (pwEditText.getText().toString().isEmpty() || !validator.validatePassword(pwEditText.getText().toString(), null)){
             // TODO - Alert the user that the username mustnt
             // TODO - Update a progress bar according to Score to show how weak the password is
-            finish();
+
         }
         else {
 
