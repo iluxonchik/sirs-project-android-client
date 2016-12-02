@@ -41,6 +41,11 @@ public class StrengthValidator {
 
     // Consider a weak password's level < WEAK_PASSWORD_LEVEL
     public boolean validatePassword(String aPassword, String aPattern) {
+        if (aPassword == null )
+            throw new IllegalArgumentException(new NullPointerException("Password is null"));
+        if (aPassword.length() <= 8)
+            return false;
+
         int pwScore = getPasswordScore(aPassword);
         return pwScore >= WEAK_PASSWORD_LEVEL && isInputSanitized(aPassword, (aPattern));
     }
