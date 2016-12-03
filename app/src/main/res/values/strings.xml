@@ -3,4 +3,5 @@
     <string name="Register" >Sign In </string>
     <string name="username_message">Username</string>
     <string name="password_message">Password</string>
+    <string name="bt_not_enabled_leaving">Bluetooth was not enabled. Leaving application...</string>
 </resources>
