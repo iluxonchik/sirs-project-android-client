@@ -48,13 +48,8 @@ public class MainActivity extends AppCompatActivity {
 
         if (mBluetoothAdapter == null) {
             Toast.makeText(this, R.string.bt_not_enabled_leaving, Toast.LENGTH_SHORT).show();
-            try {
-                Thread.currentThread().sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } finally {
-                this.finish();
-            }
+            this.finish();
+
         }
     }
 
@@ -63,12 +58,13 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
         //If BT is not on, request that it be enabled.
         if (!mBluetoothAdapter.isEnabled()) {
-            //Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            //startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
-            ensureDiscoverable();
+            Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
         } else if ( mFileCipheringService == null ) {
             setUpService();
         }
+        // Make it discoverable
+        ensureDiscoverable();
     }
 
     @Override
@@ -94,11 +90,12 @@ public class MainActivity extends AppCompatActivity {
      * Makes this device discoverable
      */
     private void ensureDiscoverable() {
-        if(mBluetoothAdapter.getScanMode() !=
+        if (mBluetoothAdapter.getScanMode() !=
                 BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
             Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
-            discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
+            discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 0); // Always discoverable
             startActivity(discoverableIntent);
+            Toast.makeText(this, R.string.warn_set_to_discoverable, Toast.LENGTH_SHORT).show();
         }
     }
     public void onActivityResult (int requestCode, int resultCode, Intent data) {
