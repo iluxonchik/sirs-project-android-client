@@ -13,6 +13,9 @@ import java.io.OutputStream;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
@@ -20,11 +23,16 @@ import java.security.spec.InvalidKeySpecException;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyAgreement;
+import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
+
+import static android.R.attr.publicKey;
 
 
 /**
@@ -41,23 +49,28 @@ public class CryptographyModule {
     final public static String SECRET_KEY__PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256";
     final public static String SECRET_KEY_ALGORITHM = "AES/CBC/PKCS5Padding";
 
-    private Key secretKey;
+    private byte[] secretKey;
     private byte[] initVector;
 
+    private Key privateKey;
+    private Key publicKey;
+    private Key receivedPublicKey;
+
     public CryptographyModule() {
-        this(null);
-    }
-    public CryptographyModule (Key aSecretKey){
-        this.secretKey = aSecretKey;
-        this.initVector = null;
+        // TODO - REMOVE DEFAULT SYM KEY
+        KeyGenerator keyGen = null;
+        try {
+            keyGen = KeyGenerator.getInstance("AES");
+            keyGen.init(256); // 32 * 8
+            secretKey = keyGen.generateKey().getEncoded(); // by default
+
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+
+        generateDHKeys();
     }
 
-    public void setSecurityParameters(byte[] aIV){
-        this.initVector = aIV;
-    }
-    public void setSecurityParameters(Key aSecretKey){
-        this.secretKey = aSecretKey;
-    }
 
     private byte[] getKeyEncoded(Key key) {
         return key.getEncoded();
@@ -77,9 +90,23 @@ public class CryptographyModule {
         SecretKeyFactory skf = SecretKeyFactory.getInstance(SECRET_KEY__PBKDF2_ALGORITHM);
         return skf.generateSecret(pbeKeySpec).getEncoded();
     }
-    public byte[] cipherAES(byte[] aBytes) {
-        if(secretKey == null)
-            throw new IllegalArgumentException(new NullPointerException("secret key is undefined."));
+    public byte[] cipher(byte[] aBytes) throws InvalidKeyException {
+        if (secretKey == null)
+            throw new InvalidKeyException("SecretKey is undefined");
+
+        final SecretKeySpec keySpec = new SecretKeySpec(secretKey, "AES");
+        return cipherAES(aBytes, keySpec);
+    }
+    public byte[] cipherDH(byte[] aBytes) throws InvalidKeyException {
+        if (publicKey == null)
+            throw new InvalidKeyException("Public key is undefined");
+
+        return cipherAES(aBytes, publicKey);
+    }
+
+    public byte[] cipherAES(byte[] aBytes, Key aKey) {
+        if(aKey == null)
+            throw new IllegalArgumentException(new NullPointerException("provided key is undefined."));
 
         byte[] cipheredBytes = null;
         ByteArrayOutputStream byteOutStream = null;
@@ -95,7 +122,7 @@ public class CryptographyModule {
             byte[] plainBytes = byteOutStream.toByteArray();
 
             Cipher cipher = Cipher.getInstance(SECRET_KEY_ALGORITHM);
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey, new IvParameterSpec(iv));
+            cipher.init(Cipher.ENCRYPT_MODE, aKey, new IvParameterSpec(iv));
             cipheredBytes = cipher.doFinal(plainBytes);
 
         }  catch (NoSuchAlgorithmException e) {
@@ -145,4 +172,34 @@ public class CryptographyModule {
         return random;
     }
 
+    public void generateDHKeys() {
+        try {
+            final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
+            keyPairGenerator.initialize(1024);
+
+            final KeyPair keyPair = keyPairGenerator.generateKeyPair();
+
+            privateKey = keyPair.getPrivate();
+            publicKey = keyPair.getPublic();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+    }
+    public void generateDHCommonSecretKey() {
+        try {
+            final KeyAgreement keyAgreement = KeyAgreement.getInstance("DH");
+            keyAgreement.init(privateKey);
+            keyAgreement.doPhase(receivedPublicKey, true);
+
+            secretKey = keyAgreement.generateSecret();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public byte[] getPublicKeyEncoded() {
+        return publicKey.getEncoded();
+    }
 }

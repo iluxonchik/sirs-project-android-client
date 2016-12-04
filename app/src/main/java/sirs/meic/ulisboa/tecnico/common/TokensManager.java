@@ -12,9 +12,13 @@ import java.io.OutputStream;
  * Created by Belem on 03/12/2016.
  */
 public class TokensManager {
+    private byte[] currentToken;
 
     public TokensManager() {}
 
+    byte[] getCurrentToken() {
+        return currentToken;
+    }
     // Store Token to file
     public void storeToken(byte[] aToken, String aFilepath) throws IOException {
         OutputStream output = null;
@@ -37,6 +41,7 @@ public class TokensManager {
             input = new BufferedInputStream(new FileInputStream(aFilePath));
             byte[] token = new byte[input.available()];
             input.read(token);
+            currentToken = token;
             return token;
         } finally {
             if (input != null) {

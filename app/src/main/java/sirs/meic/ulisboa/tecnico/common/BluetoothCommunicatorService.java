@@ -19,7 +19,7 @@ import javax.crypto.KeyGenerator;
  * Created by Belem on 03/12/2016.
  */
 
-public abstract class CommunicatorService implements IService{
+public abstract class BluetoothCommunicatorService implements IService{
 
     // Connection specific
 
@@ -35,12 +35,6 @@ public abstract class CommunicatorService implements IService{
     public static final int STATE_CONNECTING = 2;   // now initiating an outgoing connection
     public static final int STATE_CONNECTED = 3;    // now connected to a remote device
 
-
-    // Others
-    final public static String  DEFAULT_TOKEN_FILEPATH ="tokens.txt";
-    final public static String  SYM_KEY_ALGORITHM = "AES";
-    final public static int     SYM_KEY_SIZE = 256;
-
     // Connection Specific
 
     private final BluetoothAdapter mAdapter;
@@ -50,25 +44,9 @@ public abstract class CommunicatorService implements IService{
     private ConnectedThread mConnectedThread;
     private int mState;
 
-    // Others
-    private CryptographyModule cryptoModule;
-    private TokensManager tManager;
-
-
-    public CommunicatorService() {
+    public BluetoothCommunicatorService() {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
-        try {
-            mState = STATE_NONE;
-            KeyGenerator keyGen = KeyGenerator.getInstance(SYM_KEY_ALGORITHM);
-            keyGen.init(SYM_KEY_SIZE);
-            Key key = keyGen.generateKey();
-
-            cryptoModule = new CryptographyModule(key);
-            tManager = new TokensManager();
-        } catch (NoSuchAlgorithmException e) {
-
-            e.printStackTrace();
-        }
+        mState = STATE_NONE;
     }
 
     /**
@@ -208,15 +186,17 @@ public abstract class CommunicatorService implements IService{
      */
     private void connectionFailed() {
         // Start the service over to restart listening mode
-        CommunicatorService.this.start();
+        BluetoothCommunicatorService.this.start();
     }
     /**
      * Indicate that the connection was lost
      */
     private void connectionLost() {
         // Start the service over to restart listening mode
-        CommunicatorService.this.start();
+        BluetoothCommunicatorService.this.start();
     }
+
+    protected abstract void receive(byte[] aBuffer, int bytesRead, int bytesMax);
 
 
     /**
@@ -252,7 +232,7 @@ public abstract class CommunicatorService implements IService{
 
                 // if a connection was accepted
                 if (socket != null) {
-                    synchronized (CommunicatorService.this) {
+                    synchronized (BluetoothCommunicatorService.this) {
                         switch (mState) {
                             case STATE_LISTEN:
                             case STATE_CONNECTING:
@@ -325,7 +305,7 @@ public abstract class CommunicatorService implements IService{
                 return;
             }
             // Reset the ConnectThread because we're done
-            synchronized (CommunicatorService.this) {
+            synchronized (BluetoothCommunicatorService.this) {
                 mConnectThread = null;
             }
             // start the connected thread
@@ -374,11 +354,12 @@ public abstract class CommunicatorService implements IService{
             while (mState == STATE_CONNECTED) {
                 try {
                     bytes = mmInStream.read(buffer);
+                    receive(buffer, bytes, 1024);
                 } catch (IOException e) {
                     e.printStackTrace();
                     connectionLost();
                     // Start the service over to restart listening mode
-                    CommunicatorService.this.start();
+                    BluetoothCommunicatorService.this.start();
                     break;
                 }
             }
