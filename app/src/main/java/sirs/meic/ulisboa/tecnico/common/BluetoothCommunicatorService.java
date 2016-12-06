@@ -4,13 +4,10 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
-import android.os.Bundle;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.security.Key;
-import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
 
 import javax.crypto.KeyGenerator;
@@ -196,7 +193,7 @@ public abstract class BluetoothCommunicatorService implements IService{
         BluetoothCommunicatorService.this.start();
     }
 
-    protected abstract void receive(byte[] aBuffer, int bytesRead, int bytesMax);
+    protected abstract void receive(byte[] aBuffer);
 
 
     /**
@@ -354,7 +351,7 @@ public abstract class BluetoothCommunicatorService implements IService{
             while (mState == STATE_CONNECTED) {
                 try {
                     bytes = mmInStream.read(buffer);
-                    receive(buffer, bytes, 1024);
+                    receive(buffer);
                 } catch (IOException e) {
                     e.printStackTrace();
                     connectionLost();

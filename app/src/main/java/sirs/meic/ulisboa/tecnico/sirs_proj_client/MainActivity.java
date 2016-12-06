@@ -3,6 +3,8 @@ package sirs.meic.ulisboa.tecnico.sirs_proj_client;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
@@ -11,6 +13,7 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import sirs.meic.ulisboa.tecnico.common.BluetoothFileCipheringService;
+import sirs.meic.ulisboa.tecnico.common.Constants;
 import sirs.meic.ulisboa.tecnico.common.StrengthValidator;
 
 public class MainActivity extends AppCompatActivity {
@@ -118,8 +121,7 @@ public class MainActivity extends AppCompatActivity {
         mFileCipheringService = new BluetoothFileCipheringService();
     }
 
-    // TODO - GUI
-    public void signUp(View view) {
+   public void signUp(View view) {
         String pwPattern = "[a-z][a-z0-9_-\\.]*";
         if(userEditText.getText().toString().isEmpty() || !validator.isInputSanitized(userEditText.getText().toString(), null)) {
             // TODO - Alert the user that the username mustn'
@@ -133,4 +135,30 @@ public class MainActivity extends AppCompatActivity {
 
 }
     }
+
+    /*    private final Handler mHandler = new Handler() {
+     @Override
+        public void handleMessage(Message msg) {
+            switch(msg.what) {
+                case Constants.MESSAGE_STATE_CHANGE:
+                    switch(msg.arg1) {
+                        case BluetoothFileCipheringService.STATE_CONNECTED:
+                            //setStatus(get);
+                            break;
+                        case BluetoothFileCipheringService.STATE_CONNECTING:
+                            // set status
+                            break;
+                        case BluetoothFileCipheringService.STATE_LISTEN:
+                        case BluetoothFileCipheringService.STATE_NONE:
+                            // setStatus
+                            break;
+                    }
+                    break;
+                case Constants.MESSAGE_TO_SERVER:
+                    // byte[] writeBuf = (byte[]) obj;
+                    Toast.makeText(this, "", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }*/
+
 }

@@ -1,5 +1,6 @@
 package sirs.meic.ulisboa.tecnico.common;
 
+import android.app.Notification;
 import android.util.Base64;
 
 import java.io.BufferedInputStream;
@@ -16,6 +17,7 @@ import java.security.Key;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
@@ -57,20 +59,8 @@ public class CryptographyModule {
     private Key receivedPublicKey;
 
     public CryptographyModule() {
-        // TODO - REMOVE DEFAULT SYM KEY
-        KeyGenerator keyGen = null;
-        try {
-            keyGen = KeyGenerator.getInstance("AES");
-            keyGen.init(256); // 32 * 8
-            secretKey = keyGen.generateKey().getEncoded(); // by default
-
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
-
         generateDHKeys();
     }
-
 
     private byte[] getKeyEncoded(Key key) {
         return key.getEncoded();
@@ -98,7 +88,7 @@ public class CryptographyModule {
         return cipherAES(aBytes, keySpec);
     }
     public byte[] cipherDH(byte[] aBytes) throws InvalidKeyException {
-        if (publicKey == null)
+        if (secretKey == null)
             throw new InvalidKeyException("Public key is undefined");
 
         return cipherAES(aBytes, publicKey);
@@ -112,17 +102,16 @@ public class CryptographyModule {
         ByteArrayOutputStream byteOutStream = null;
 
         try {
-            byte[] nonce = getRandom();
-            byte[] iv = initVector != null ? initVector : nonce;
+            initVector = getRandom();
 
             byteOutStream = new ByteArrayOutputStream();
             byteOutStream.write(aBytes);
-            byteOutStream.write(nonce);
+            byteOutStream.write(initVector);
 
             byte[] plainBytes = byteOutStream.toByteArray();
 
             Cipher cipher = Cipher.getInstance(SECRET_KEY_ALGORITHM);
-            cipher.init(Cipher.ENCRYPT_MODE, aKey, new IvParameterSpec(iv));
+            cipher.init(Cipher.ENCRYPT_MODE, aKey, new IvParameterSpec(initVector));
             cipheredBytes = cipher.doFinal(plainBytes);
 
         }  catch (NoSuchAlgorithmException e) {
@@ -198,8 +187,15 @@ public class CryptographyModule {
             e.printStackTrace();
         }
     }
+    public byte[] hash(byte[] aBytes) throws NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        return digest.digest(aBytes);
+    }
 
+    public byte[] getInitVector() {return initVector; }
     public byte[] getPublicKeyEncoded() {
         return publicKey.getEncoded();
     }
+
+
 }
