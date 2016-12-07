@@ -3,6 +3,8 @@ package sirs.meic.ulisboa.tecnico.common;
 import android.app.Notification;
 import android.util.Base64;
 
+import com.google.common.primitives.Ints;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
@@ -52,13 +54,14 @@ public class CryptographyModule {
     final public static String SECRET_KEY_ALGORITHM = "AES/CBC/PKCS5Padding";
 
     private byte[] secretKey;
-    private byte[] initVector;
+    private int counter; // used as IV, to ensure freshness
 
     private Key privateKey;
     private Key publicKey;
     private Key receivedPublicKey;
 
     public CryptographyModule() {
+        counter = 0;
         generateDHKeys();
     }
 
@@ -102,16 +105,15 @@ public class CryptographyModule {
         ByteArrayOutputStream byteOutStream = null;
 
         try {
-            initVector = getRandom();
 
             byteOutStream = new ByteArrayOutputStream();
             byteOutStream.write(aBytes);
-            byteOutStream.write(initVector);
-
+            byteOutStream.write(counter);
+            counter ++;
             byte[] plainBytes = byteOutStream.toByteArray();
 
             Cipher cipher = Cipher.getInstance(SECRET_KEY_ALGORITHM);
-            cipher.init(Cipher.ENCRYPT_MODE, aKey, new IvParameterSpec(initVector));
+            cipher.init(Cipher.ENCRYPT_MODE, aKey, new IvParameterSpec(getInitVector()));
             cipheredBytes = cipher.doFinal(plainBytes);
 
         }  catch (NoSuchAlgorithmException e) {
@@ -192,7 +194,7 @@ public class CryptographyModule {
         return digest.digest(aBytes);
     }
 
-    public byte[] getInitVector() {return initVector; }
+    public byte[] getInitVector() {return Ints.toByteArray(counter); }
     public byte[] getPublicKeyEncoded() {
         return publicKey.getEncoded();
     }

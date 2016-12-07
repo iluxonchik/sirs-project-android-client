@@ -25,9 +25,9 @@ public class MainActivity extends AppCompatActivity {
     private StrengthValidator validator;
 
     // Layout views
-    private EditText pwEditText;
-    private EditText userEditText;
-    private Button registerBttn;
+    private EditText etPassword;
+    private EditText etUsername;
+    private Button bLogin;
 
     /**
      * Local Bluetooth Adapter
@@ -41,9 +41,9 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        registerBttn = (Button) findViewById(R.id.registerBttn);
-        pwEditText = (EditText)findViewById(R.id.pwEditText);
-        userEditText = (EditText)findViewById(R.id.userEditText);
+        bLogin = (Button) findViewById(R.id.bLogin);
+        etPassword = (EditText)findViewById(R.id.etPassword);
+        etUsername = (EditText)findViewById(R.id.etUsername);
 
         validator = new StrengthValidator();
 
@@ -63,11 +63,10 @@ public class MainActivity extends AppCompatActivity {
         if (!mBluetoothAdapter.isEnabled()) {
             Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
+
         } else if ( mFileCipheringService == null ) {
             setUpService();
         }
-        // Make it discoverable
-        ensureDiscoverable();
     }
 
     @Override
@@ -106,6 +105,8 @@ public class MainActivity extends AppCompatActivity {
             case REQUEST_ENABLE_BT:
                 // When the request to enable Bluetooth returns
                 if (resultCode == Activity.RESULT_OK) {
+                    // Make it discoverable
+                    ensureDiscoverable();
                     // BT is now enabled, so set up a chat session
                     setUpService();
                 } else {
@@ -123,10 +124,10 @@ public class MainActivity extends AppCompatActivity {
 
    public void signUp(View view) {
         String pwPattern = "[a-z][a-z0-9_-\\.]*";
-        if(userEditText.getText().toString().isEmpty() || !validator.isInputSanitized(userEditText.getText().toString(), null)) {
+        if(etUsername.getText().toString().isEmpty() || !validator.isInputSanitized(etUsername.getText().toString(), null)) {
             // TODO - Alert the user that the username mustn'
         }
-        else if (pwEditText.getText().toString().isEmpty() || !validator.validatePassword(pwEditText.getText().toString(), null)){
+        else if (etPassword.getText().toString().isEmpty() || !validator.validatePassword(etPassword.getText().toString(), null)){
             // TODO - Alert the user that the username mustnt
             // TODO - Update a progress bar according to Score to show how weak the password is
 

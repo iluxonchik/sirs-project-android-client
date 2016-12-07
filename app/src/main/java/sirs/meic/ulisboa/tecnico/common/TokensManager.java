@@ -21,8 +21,11 @@ public class TokensManager extends FilesManager {
     public void storeToken(byte[] aToken) throws IOException {
        super.store(aToken, DEFAULT_TOKEN_FILEPATH);
     }
-    public byte[] loadToken() throws IOException {
-        return super.load(DEFAULT_TOKEN_FILEPATH);
+    public byte[] loadToken() throws IOException, NeedToLoginException {
+        byte[] token = super.load(DEFAULT_TOKEN_FILEPATH);
+        if(token == null) throw new NeedToLoginException();
+        else return token;
+
     }
 
 }

@@ -26,6 +26,7 @@ public class FilesManager {
         OutputStream output = null;
         try {
             output = new BufferedOutputStream(new FileOutputStream(aFilepath));
+            lastSeenArg = aToken;
             output.write(aToken);
         } finally {
             if (output != null) {
