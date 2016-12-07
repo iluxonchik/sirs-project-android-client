@@ -7,6 +7,8 @@ import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -17,17 +19,16 @@ import sirs.meic.ulisboa.tecnico.common.Constants;
 import sirs.meic.ulisboa.tecnico.common.StrengthValidator;
 
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "MainActivity";
+    private static final String ADDRESS = "24:0A:64:91:D4:D0";
 
     // Intent Request Codes
     private static final int REQUEST_ENABLE_BT = 1;
 
-
-    private StrengthValidator validator;
-
-    // Layout views
-    private EditText etPassword;
     private EditText etUsername;
+    private EditText etPassword;
     private Button bLogin;
+    private StrengthValidator validator;
 
     /**
      * Local Bluetooth Adapter
@@ -41,9 +42,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        bLogin = (Button) findViewById(R.id.bLogin);
-        etPassword = (EditText)findViewById(R.id.etPassword);
+
+
         etUsername = (EditText)findViewById(R.id.etUsername);
+        etPassword = (EditText)findViewById(R.id.etPassword);
+        bLogin = (Button) findViewById(R.id.bLogin);
 
         validator = new StrengthValidator();
 
@@ -54,6 +57,41 @@ public class MainActivity extends AppCompatActivity {
             this.finish();
 
         }
+
+        bLogin.setOnClickListener( new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(validate())
+                    login();
+                else
+                    Log.d(TAG, "No login");
+            }
+        });
+    }
+
+    public boolean validate() {
+        Log.d(TAG, "Validate");
+
+        Log.d(TAG, "Validating username " + etUsername.getText().toString());
+        Log.d(TAG, "Validating password " + etPassword.getText().toString());
+        if(etUsername.getText().toString().isEmpty() || !validator.isInputSanitized(etUsername.getText().toString(), null)) {
+            Log.d(TAG, "Invalid username.");
+            Toast.makeText(this, R.string.usr_bad_format, Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        else if (etPassword.getText().toString().isEmpty() || !validator.validatePassword(etPassword.getText().toString(), null)){
+            Log.d(TAG, "Invalid password. Feedback: " + validator.getPasswordFeedback(etPassword.getText().toString()).toString());
+            Toast.makeText(this, R.string.weak_or_bad_format, Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        else {
+            Log.d(TAG, "Valid input.");
+            return true;
+        }
+    }
+
+    private void login() {
+        Log.d(TAG, "Login");
     }
 
     @Override
@@ -122,20 +160,6 @@ public class MainActivity extends AppCompatActivity {
         mFileCipheringService = new BluetoothFileCipheringService();
     }
 
-   public void signUp(View view) {
-        String pwPattern = "[a-z][a-z0-9_-\\.]*";
-        if(etUsername.getText().toString().isEmpty() || !validator.isInputSanitized(etUsername.getText().toString(), null)) {
-            // TODO - Alert the user that the username mustn'
-        }
-        else if (etPassword.getText().toString().isEmpty() || !validator.validatePassword(etPassword.getText().toString(), null)){
-            // TODO - Alert the user that the username mustnt
-            // TODO - Update a progress bar according to Score to show how weak the password is
-
-        }
-        else {
-
-}
-    }
 
     /*    private final Handler mHandler = new Handler() {
      @Override
@@ -162,4 +186,5 @@ public class MainActivity extends AppCompatActivity {
         }
     }*/
 
+    
 }

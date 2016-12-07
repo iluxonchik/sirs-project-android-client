@@ -3,6 +3,8 @@
     <string name="Register" >Sign In </string>
     <string name="username_message">Username</string>
     <string name="password_message">Password</string>
+    <string name="usr_bad_format">Invalid Username.</string>
+    <string name="weak_or_bad_format">Invalid Password (too weak).</string>
     <string name="bt_not_enabled_leaving">Bluetooth was not enabled. Leaving application...</string>
     <string name="warn_set_to_discoverable">Bluetooth is now visible for every one.</string>
 

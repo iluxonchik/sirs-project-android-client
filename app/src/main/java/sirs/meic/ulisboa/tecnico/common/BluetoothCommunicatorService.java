@@ -207,7 +207,7 @@ public abstract class BluetoothCommunicatorService implements IService{
             BluetoothServerSocket tmp = null;
             // create a new listening server socket
             try{
-                tmp = mAdapter.listenUsingRfcommWithServiceRecord(NAME_SECURE, MY_UUID_SECURE); // todo - WHY?
+                tmp = mAdapter.listenUsingRfcommWithServiceRecord(NAME_SECURE, MY_UUID_SECURE);
             } catch (IOException e) {
                 //
             }
