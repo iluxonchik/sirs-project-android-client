@@ -1,6 +1,8 @@
 package sirs.meic.ulisboa.tecnico.common;
 
+import android.os.Handler;
 import android.util.Base64;
+import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -8,7 +10,6 @@ import java.nio.ByteBuffer;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
-import java.util.Timer;
 
 
 /**
@@ -16,6 +17,7 @@ import java.util.Timer;
  */
 
 public class BluetoothFileCipheringService extends BluetoothCommunicatorService {
+    private static final String TAG = "BluetoothFileCiphering";
     private static final String DIFFIE_HELLMAN_KEY = "DH_Key";
 
     // Protocol specific Messages
@@ -36,21 +38,31 @@ public class BluetoothFileCipheringService extends BluetoothCommunicatorService 
     private byte[] hashPw;
     private int counter;
 
-    public BluetoothFileCipheringService()   {
-        super();
+    public BluetoothFileCipheringService(Handler handler)   {
+        super(handler);
         this.counter = 0;
         cryptoModule = new CryptographyModule();
-        // todo - enviar DH public key ao server
         tManager = new TokensManager();
     }
 
-    public void init(String aUsername, String aPassword) throws InvalidKeySpecException,
+    public void login(String aUsername, String aPassword) throws InvalidKeySpecException,
                                             NoSuchAlgorithmException, NeedToLoginException {
         this.username = aUsername;
         hashPw = cryptoModule.applyPBKDeviation(aUsername, aPassword);
         try {
-            tManager.loadToken(); // raised because it's required that the user inserts a pw
+            tManager.loadToken(); // NeedToLoginException raised because it's required that the user inserts a pw
         } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void init (){
+        byte[] dhPublicKey = cryptoModule.signRSAPrivateKey(cryptoModule.getDHPublicKeyEncoded());
+        try {
+            write(encodeBase64inBytes(dhPublicKey));
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
     }
@@ -67,47 +79,92 @@ public class BluetoothFileCipheringService extends BluetoothCommunicatorService 
 
             System.out.println("Sent message");
         } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
+            Log.e(TAG, "send() Problems finding algorithms ", e);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "send() Problems in streams ", e);
         } catch (InvalidKeySpecException e) {
-            e.printStackTrace();
+            Log.e(TAG, "send() Problems in keys specifications ", e);
         } finally {
             try {
                 bos.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.e(TAG, "send() Problems in closing streams ", e);
             }
         }
-
     }
 
-    protected void receive(byte[] aBuffer) {
+    protected void receive(byte[] aBuffer) { // TODO - RECEBER CHAVE DH
+
         if(aBuffer != null && aBuffer.length > 0) {
             byte[] bytes = decodeBase64(aBuffer);
-            String request = new String(bytes);
+            byte[] requestBytes =  null;
+            String request = "";
 
-            System.out.println("Received request: " + request);
-            switch(request) {
-                case NEW_TOKEN:
-                    updateToken(bytes, request.length());
-                    break;
-                case TOKEN_WRONG_ERR:
-                case PWD_LOGIN_ERR:
-                    send(PWD_LOGIN);
-                    break;
-                case NO_USR_ERR:
-                    send(USR_REG);
-                    try{
-                        Thread.sleep(1000 * 2); // 2s
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    send(PWD_LOGIN);
+            try {
+                if(validateMessage(bytes)){
+                    requestBytes = getDecipheredRequest(bytes);
+                    request = new String(requestBytes);
+                    Log.d(TAG, "Received request: " + request);
+                }
+            } catch (InvalidKeyException e) {Log.e(TAG, "receive() Couldn't validate msg ", e); return;
+            } catch (IOException e) {Log.e(TAG, "receive() Couldn't validate msg", e); return;
+            } catch (NoSuchAlgorithmException e) {Log.e(TAG, "receive() Couldn't validate msg ", e); return;
+            }
 
+            if (request.contains(NEW_TOKEN)) {
+                byte[] token = subArray(requestBytes, NEW_TOKEN.length(), request.length() - NEW_TOKEN.length());
+                Log.d(TAG, "token: " + token.toString());
+                updateToken(token, request.length());
+                Log.d(TAG, "updated token: " );
+            }
+            else if (request.contains(TOKEN_WRONG_ERR) || request.contains(PWD_LOGIN_ERR)) {
+                send(PWD_LOGIN);
+            }
+            else if (request.contains(NO_USR_ERR)) {
+                send(USR_REG);
+                try{
+                    Thread.sleep(1000 * 2); // 2s
+                } catch (InterruptedException e) {
+                }
+                send(PWD_LOGIN);
             }
         }
     }
+
+    private boolean validateMessage(byte[] bytes) throws InvalidKeyException, IOException, NoSuchAlgorithmException {
+        int requestLength = bytes.length - 16 - 256;
+        byte[] request = subArray(bytes, 0, requestLength); //IV || HMACSHA256
+        byte[] nonce = subArray(bytes, requestLength, 16);
+        byte[] mac = subArray(bytes, requestLength + 16, 256);
+
+        if (!cryptoModule.isNonceValid(nonce)) {
+            return false;
+        }
+        byte[] decipherMsg = cryptoModule.decipher(request);
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        bos.write(decipherMsg);
+        bos.write(nonce);
+
+        if (!cryptoModule.verifyMAC(bos.toByteArray(), mac)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private byte[] subArray(byte[] aByte, int startIndex, int offset) {
+        ByteBuffer bb = ByteBuffer.allocate(offset);
+        if(startIndex > -1 && offset < aByte.length && (startIndex + offset) < aByte.length ) {
+            for(int i = 0; i < offset ; i++ ) {
+                bb.put(aByte[i]);
+            }
+            return bb.array();
+
+        }
+        else
+            return null;
+    }
+
 
     private void updateToken(byte[] aToken, int offset) {
         if(aToken != null && aToken.length > offset) {
@@ -207,4 +264,10 @@ public class BluetoothFileCipheringService extends BluetoothCommunicatorService 
         return Base64.decode(aByteArr, Base64.DEFAULT);
     }
 
+    public byte[] getDecipheredRequest(byte[] aBytes) throws InvalidKeyException, IOException {
+        int requestLength = aBytes.length - 16 - 256;
+        byte[] request = subArray(aBytes, 0, requestLength);
+        return cryptoModule.decipher(request);
+
+    }
 }

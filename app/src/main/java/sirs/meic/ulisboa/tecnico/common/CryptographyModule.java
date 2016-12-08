@@ -1,18 +1,20 @@
 package sirs.meic.ulisboa.tecnico.common;
 
-import android.app.Notification;
 import android.util.Base64;
+import android.util.Log;
 
+import com.google.common.io.Files;
 import com.google.common.primitives.Ints;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
@@ -21,22 +23,34 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.security.SignatureException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyAgreement;
-import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
+import javax.crypto.interfaces.DHPrivateKey;
+import javax.crypto.spec.DHParameterSpec;
+import javax.crypto.spec.DHPublicKeySpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import static android.R.attr.publicKey;
 
 
 /**
@@ -46,6 +60,12 @@ import static android.R.attr.publicKey;
  */
 
 public class CryptographyModule {
+    private static final String TAG = "CryptographyModule";
+    private static final String CA_PUBLIC_KEY_FILEPATH = "rootCA.key";
+    private static final String SERVER_CERTIFICATE_FILEPATH = "server.cert";
+    private static final String CLIENT_PRIVATE_KEY_FILEPATH = "client.key";
+
+
     final private static char[] hexArray = "0123456789ABCDEF".toCharArray();
     final private static int ITERATION_COUNT = 100;
     final public static int SECRET_KEY_ALGORITHM_BLOCK_SIZE = 32;
@@ -53,11 +73,14 @@ public class CryptographyModule {
     final public static String SECRET_KEY__PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256";
     final public static String SECRET_KEY_ALGORITHM = "AES/CBC/PKCS5Padding";
 
+    final public static BigInteger DH_PUBLIC_VALUE_P = BigInteger.valueOf(1234567890);
+    final public static BigInteger DH_PUBLIC_VALUE_G = BigInteger.valueOf(1234567890);
+
     private byte[] secretKey;
     private int counter; // used as IV, to ensure freshness
 
-    private Key privateKey;
-    private Key publicKey;
+    private Key DHPrivateKey;
+    private Key DHPublicKey;
     private Key receivedPublicKey;
 
     public CryptographyModule() {
@@ -94,9 +117,8 @@ public class CryptographyModule {
         if (secretKey == null)
             throw new InvalidKeyException("Public key is undefined");
 
-        return cipherAES(aBytes, publicKey);
+        return cipherAES(aBytes, DHPublicKey);
     }
-
     public byte[] cipherAES(byte[] aBytes, Key aKey) {
         if(aKey == null)
             throw new IllegalArgumentException(new NullPointerException("provided key is undefined."));
@@ -140,6 +162,38 @@ public class CryptographyModule {
             return cipheredBytes;
         }
     }
+    public byte[] decipher(byte[] aBytes) throws InvalidKeyException{
+        if (secretKey == null)
+            throw new InvalidKeyException("SecretKey is undefined");
+
+        final SecretKeySpec keySpec = new SecretKeySpec(secretKey, "AES");
+        return decipherAES(aBytes, keySpec);
+    }
+    public byte[] decipherAES(byte[] aBytes, Key aKey) throws InvalidKeyException {
+        if(aKey == null)
+            throw new IllegalArgumentException(new NullPointerException("provided key is undefined."));
+
+        byte[] plainBytes = null;
+
+        Cipher cipher = null;
+        try {
+            cipher = Cipher.getInstance(SECRET_KEY_ALGORITHM);
+            cipher.init(Cipher.DECRYPT_MODE, aKey, new IvParameterSpec(getInitVector()));
+            plainBytes = cipher.doFinal(aBytes);
+
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (InvalidAlgorithmParameterException e) {
+            e.printStackTrace();
+        }
+        return plainBytes;
+    }
 
     public String  getEncodingHex(byte[] aArg) throws InvalidKeySpecException, NoSuchAlgorithmException {
         char[] hexChars = new char[aArg.length * 2];
@@ -165,28 +219,42 @@ public class CryptographyModule {
 
     public void generateDHKeys() {
         try {
-            final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
+            /* final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
             keyPairGenerator.initialize(1024);
 
             final KeyPair keyPair = keyPairGenerator.generateKeyPair();
 
-            privateKey = keyPair.getPrivate();
-            publicKey = keyPair.getPublic();
+            DHprivateKey = keyPair.getPrivate();
+            DHPublicKey = keyPair.getPublic(); */
+
+            KeyPairGenerator kpg = KeyPairGenerator.getInstance("DH");
+
+            DHParameterSpec param = new DHParameterSpec(DH_PUBLIC_VALUE_P, DH_PUBLIC_VALUE_P);
+            kpg.initialize(param);
+            KeyPair p = kpg.generateKeyPair();
+
+            KeyFactory kf = KeyFactory.getInstance("DH");
+            DHPublicKey  = p.getPublic();
+            DHPrivateKey = p.getPrivate();
+
         } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidAlgorithmParameterException e) {
             e.printStackTrace();
         }
     }
     public void generateDHCommonSecretKey() {
         try {
             final KeyAgreement keyAgreement = KeyAgreement.getInstance("DH");
-            keyAgreement.init(privateKey);
+
+            keyAgreement.init(DHPrivateKey);
             keyAgreement.doPhase(receivedPublicKey, true);
 
             secretKey = keyAgreement.generateSecret();
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         } catch (InvalidKeyException e) {
-            e.printStackTrace();
+            Log.e(TAG, "generateDHCommonSecretKey() Could not generate DH common session key exception", e);
         }
     }
     public byte[] hash(byte[] aBytes) throws NoSuchAlgorithmException {
@@ -194,10 +262,122 @@ public class CryptographyModule {
         return digest.digest(aBytes);
     }
 
-    public byte[] getInitVector() {return Ints.toByteArray(counter); }
-    public byte[] getPublicKeyEncoded() {
-        return publicKey.getEncoded();
+    public byte[] getInitVector() {return ByteBuffer.allocate(16).putInt(counter).array(); }
+    public byte[] getDHPublicKeyEncoded() {
+        return DHPublicKey.getEncoded();
+    }
+    public byte[] signRSAPrivateKey(byte[] aBytes) {
+
+        byte[] keyBytes = null;
+        try {
+            keyBytes = Files.toByteArray(new File(CLIENT_PRIVATE_KEY_FILEPATH));
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            PrivateKey pk = kf.generatePrivate(spec);
+
+            Cipher cipher = Cipher.getInstance("RSA");
+            cipher.init(Cipher.DECRYPT_MODE, pk);
+
+            return cipher.doFinal(aBytes);
+        } catch (IOException e) {
+            Log.e(TAG, "signRSAPrivateKey() IOException exception", e);
+        } catch (InvalidKeySpecException e) {
+            Log.e(TAG, "signRSAPrivateKey() InvalidKeySpecException exception", e);
+        } catch (NoSuchAlgorithmException e) {
+            Log.e(TAG, "signRSAPrivateKey() NoSuchAlgorithmException exception", e);
+        } catch (BadPaddingException e) {
+            Log.e(TAG, "signRSAPrivateKey() BadPaddingException exception", e);
+        } catch (IllegalBlockSizeException e) {
+            Log.e(TAG, "signRSAPrivateKey() IllegalBlockSizeException exception", e);
+        } catch (NoSuchPaddingException e) {
+            Log.e(TAG, "signRSAPrivateKey() NoSuchPaddingException exception", e);
+        } catch (InvalidKeyException e) {
+            Log.e(TAG, "signRSAPrivateKey() InvalidKeyException exception", e);
+        }
+        return null;
     }
 
+    public boolean isNonceValid(byte[] nonce) {
+        byte[] byteArray = Ints.toByteArray(counter);
+        if (Arrays.equals(nonce, byteArray)) {
+            counter++;
+            Log.d(TAG, "Nonce " + counter + " is valid");
+            return true;
+        } else {
+            Log.d(TAG, "Invalid nonce " + counter);
+            return false;
+        }
+    }
 
+    public byte[] storeDHReceivedKey(byte[] aBytes) {
+
+        // Validate Signature of Server Certificate
+        InputStream serverInput = null;
+        try {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            serverInput = new BufferedInputStream(new FileInputStream(SERVER_CERTIFICATE_FILEPATH));
+            X509Certificate serverCert = (X509Certificate) cf.generateCertificate(serverInput);
+            serverCert.checkValidity();
+
+            // READ CA PUBLIC KEY
+            byte[] keyBytes = Files.toByteArray(new File(CA_PUBLIC_KEY_FILEPATH));
+            X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            PublicKey pk = kf.generatePublic(spec);
+            serverCert.verify(pk);
+
+            // If Certificate is ok, Then get public key from serverCert
+            PublicKey serverRSAPubKey = serverCert.getPublicKey();
+
+            Cipher cipher = Cipher.getInstance("RSA");
+            cipher.init(Cipher.DECRYPT_MODE, serverRSAPubKey);
+
+            return cipher.doFinal(aBytes);
+        } catch (FileNotFoundException e) {
+            Log.e(TAG, "storeDHReceivedKey() File not found exception", e);
+        } catch (IOException e) {
+            Log.e(TAG, "storeDHReceivedKey() IOException exception", e);
+        } catch (NoSuchAlgorithmException e) {
+            Log.e(TAG, "storeDHReceivedKey() NoSuchAlgorithmException exception", e);
+        } catch (InvalidKeyException e) {
+            Log.e(TAG, "storeDHReceivedKey() InvalidKeyException exception", e);
+        } catch (SignatureException e) {
+            Log.e(TAG, "storeDHReceivedKey() SignatureException exception", e);
+        } catch (NoSuchProviderException e) {
+            Log.e(TAG, "storeDHReceivedKey() NoSuchProviderException exception", e);
+        } catch (InvalidKeySpecException e) {
+            Log.e(TAG, "storeDHReceivedKey() InvalidKeySpecException exception", e);
+        } catch (BadPaddingException e) {
+            Log.e(TAG, "storeDHReceivedKey() BadPaddingException exception", e);
+        } catch (IllegalBlockSizeException e) {
+            Log.e(TAG, "storeDHReceivedKey() IllegalBlockSizeException exception", e);
+        } catch (NoSuchPaddingException e) {
+            Log.e(TAG, "storeDHReceivedKey() NoSuchPaddingException exception", e);
+        } catch (CertificateExpiredException e) {
+            Log.e(TAG, "storeDHReceivedKey() Certificate Expired  exception", e);
+        } catch (CertificateNotYetValidException e) {
+            Log.e(TAG, "storeDHReceivedKey() CertificateNotYetValidException  exception", e);
+        } catch (CertificateException e) {
+            Log.e(TAG, "storeDHReceivedKey() Certificate  exception", e);
+        } finally {
+            if (serverInput != null) {
+                try {
+                    serverInput.close();
+                } catch (IOException e) {
+                    Log.e(TAG, "checkSignature() File Could not close crypto module server certificate inputstream", e);
+                }
+            }
+        }
+        return null;
+    }
+    public void receiveDHKey(byte[] aBytes) {
+        //receivedPublicKey = storeDHReceivedKey(aBytes);
+
+    }
+
+    public boolean verifyMAC(byte[] originalMsg, byte[] sentDigest) throws NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] orignalMAC = digest.digest(originalMsg);
+        return Arrays.equals(originalMsg, sentDigest);
+    }
 }

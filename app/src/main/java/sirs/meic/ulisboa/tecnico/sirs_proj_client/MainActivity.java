@@ -2,21 +2,28 @@ package sirs.meic.ulisboa.tecnico.sirs_proj_client;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+
+import sirs.meic.ulisboa.tecnico.common.BluetoothCommunicatorService;
 import sirs.meic.ulisboa.tecnico.common.BluetoothFileCipheringService;
 import sirs.meic.ulisboa.tecnico.common.Constants;
+import sirs.meic.ulisboa.tecnico.common.NeedToLoginException;
 import sirs.meic.ulisboa.tecnico.common.StrengthValidator;
+
+import static android.widget.Toast.*;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
@@ -30,6 +37,8 @@ public class MainActivity extends AppCompatActivity {
     private Button bLogin;
     private StrengthValidator validator;
 
+    private String mConnectedDevice = null;
+
     /**
      * Local Bluetooth Adapter
      */
@@ -42,8 +51,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-
-
         etUsername = (EditText)findViewById(R.id.etUsername);
         etPassword = (EditText)findViewById(R.id.etPassword);
         bLogin = (Button) findViewById(R.id.bLogin);
@@ -53,7 +60,7 @@ public class MainActivity extends AppCompatActivity {
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
         if (mBluetoothAdapter == null) {
-            Toast.makeText(this, R.string.bt_not_enabled_leaving, Toast.LENGTH_SHORT).show();
+            makeText(this, R.string.bt_not_enabled_leaving, LENGTH_SHORT).show();
             this.finish();
 
         }
@@ -76,12 +83,12 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Validating password " + etPassword.getText().toString());
         if(etUsername.getText().toString().isEmpty() || !validator.isInputSanitized(etUsername.getText().toString(), null)) {
             Log.d(TAG, "Invalid username.");
-            Toast.makeText(this, R.string.usr_bad_format, Toast.LENGTH_SHORT).show();
+            makeText(this, R.string.usr_bad_format, LENGTH_SHORT).show();
             return false;
         }
         else if (etPassword.getText().toString().isEmpty() || !validator.validatePassword(etPassword.getText().toString(), null)){
             Log.d(TAG, "Invalid password. Feedback: " + validator.getPasswordFeedback(etPassword.getText().toString()).toString());
-            Toast.makeText(this, R.string.weak_or_bad_format, Toast.LENGTH_SHORT).show();
+            makeText(this, R.string.weak_or_bad_format, LENGTH_SHORT).show();
             return false;
         }
         else {
@@ -92,6 +99,19 @@ public class MainActivity extends AppCompatActivity {
 
     private void login() {
         Log.d(TAG, "Login");
+        try {
+            mFileCipheringService.login(etUsername.getText().toString(), etPassword.getText().toString());
+            return;
+        } catch (InvalidKeySpecException e) {
+            Log.e(TAG, "No key spec exception", e);
+            makeText(this, "Due to unexpected exception we couldn't login.", LENGTH_SHORT).show();
+        } catch (NoSuchAlgorithmException e) {
+            Log.e(TAG, "No key spec exception", e);
+            makeText(this, "Due to unexpected exception we couldn't login.", LENGTH_SHORT).show();
+        } catch (NeedToLoginException e) {
+            makeText(this, "Need to login again.", LENGTH_SHORT).show();
+            Log.e(TAG, "No key spec exception", e);
+        }
     }
 
     @Override
@@ -135,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
             Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
             discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 0); // Always discoverable
             startActivity(discoverableIntent);
-            Toast.makeText(this, R.string.warn_set_to_discoverable, Toast.LENGTH_SHORT).show();
+            makeText(this, R.string.warn_set_to_discoverable, LENGTH_SHORT).show();
         }
     }
     public void onActivityResult (int requestCode, int resultCode, Intent data) {
@@ -149,7 +169,7 @@ public class MainActivity extends AppCompatActivity {
                     setUpService();
                 } else {
                     // User did not enable Bluetooth or an error occurred
-                    Toast.makeText(this, R.string.bt_not_enabled_leaving, Toast.LENGTH_SHORT).show();
+                    makeText(this, R.string.bt_not_enabled_leaving, LENGTH_SHORT).show();
                     this.finish();
                 }
 
@@ -157,34 +177,62 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setUpService() {
-        mFileCipheringService = new BluetoothFileCipheringService();
+        Log.d(TAG, "setUpService()");
+        mFileCipheringService = new BluetoothFileCipheringService(mHandler);
+        connectDevice(Constants.BT_ADDRESS_SONY_XPERIA);
+        /*try {
+            mFileCipheringService.login(null, null);
+            makeText(this, "No need for login. Already had a token", Toast.LENGTH_SHORT).show();
+            bLogin.setEnabled(false);
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NeedToLoginException e) {
+            e.printStackTrace();
+        } */
     }
 
-
-    /*    private final Handler mHandler = new Handler() {
-     @Override
+    public final Handler mHandler = new Handler() {
+        @Override
         public void handleMessage(Message msg) {
             switch(msg.what) {
                 case Constants.MESSAGE_STATE_CHANGE:
                     switch(msg.arg1) {
                         case BluetoothFileCipheringService.STATE_CONNECTED:
-                            //setStatus(get);
+                            Toast.makeText(MainActivity.this, "Connected", Toast.LENGTH_SHORT).show();
                             break;
-                        case BluetoothFileCipheringService.STATE_CONNECTING:
-                            // set status
+                        case BluetoothCommunicatorService.STATE_CONNECTING:
+                            Toast.makeText(MainActivity.this, "Connecting", Toast.LENGTH_SHORT).show();
                             break;
-                        case BluetoothFileCipheringService.STATE_LISTEN:
-                        case BluetoothFileCipheringService.STATE_NONE:
-                            // setStatus
+                        case BluetoothCommunicatorService.STATE_LISTEN:
+                        case BluetoothCommunicatorService.STATE_NONE:
+                            Toast.makeText(MainActivity.this, "Not connected", Toast.LENGTH_SHORT).show();
                             break;
                     }
                     break;
-                case Constants.MESSAGE_TO_SERVER:
-                    // byte[] writeBuf = (byte[]) obj;
-                    Toast.makeText(this, "", Toast.LENGTH_SHORT).show();
-            }
+                case Constants.MESSAGE_DEVICE_NAME:
+                    Toast.makeText(MainActivity.this, "Connected to " + mConnectedDevice, Toast.LENGTH_SHORT).show();
+                    break;
+                case Constants.MESSAGE_TOAST:
+                    Toast.makeText(MainActivity.this, msg.getData().getString(Constants.TOAST), Toast.LENGTH_SHORT).show();
+            };
         }
-    }*/
+    };
 
-    
+    private void connectDevice(String aDeviceAddress) {
+        if(mBluetoothAdapter.checkBluetoothAddress(aDeviceAddress)) {
+            mConnectedDevice = aDeviceAddress;
+            BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(aDeviceAddress);
+            Log.d(TAG, "connectDevice() " + aDeviceAddress + ". Connecting");
+            mFileCipheringService.connect(device);
+            Log.d(TAG, "connectDevice() " + aDeviceAddress + ".Already connected");
+        }
+        else {
+            Toast.makeText(this, "setUpService() BT_ADDR: " + aDeviceAddress + " not valid", Toast.LENGTH_SHORT).show();
+        }
+
+    }
+
+
 }

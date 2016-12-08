@@ -4,6 +4,10 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
+import android.util.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,6 +21,7 @@ import javax.crypto.KeyGenerator;
  */
 
 public abstract class BluetoothCommunicatorService implements IService{
+    private static final String TAG = "BTCommunicatorService";
 
     // Connection specific
 
@@ -40,10 +45,12 @@ public abstract class BluetoothCommunicatorService implements IService{
     private ConnectThread mConnectThread;
     private ConnectedThread mConnectedThread;
     private int mState;
+    private final Handler mHandler;
 
-    public BluetoothCommunicatorService() {
+    public BluetoothCommunicatorService(Handler mHandler) {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mState = STATE_NONE;
+        this.mHandler = mHandler;
     }
 
     /**
@@ -51,7 +58,9 @@ public abstract class BluetoothCommunicatorService implements IService{
      * @param aState An integer defining the current connection state
      */
     private synchronized void setState(int aState) {
+        Log.d(TAG, "setState() " + mState + "->" + aState);
         mState = aState;
+        mHandler.obtainMessage(Constants.MESSAGE_STATE_CHANGE, aState, -1).sendToTarget();
     }
     /**
      *  Return the current connection state
@@ -66,6 +75,8 @@ public abstract class BluetoothCommunicatorService implements IService{
      */
     @Override
     public synchronized void start() {
+        Log.d(TAG, "start");
+
         // Cancel any thread attempting to make a connection
         if (mConnectThread != null){
             mConnectThread.cancel();
@@ -86,11 +97,13 @@ public abstract class BluetoothCommunicatorService implements IService{
     }
 
     /**
-     * Start the ConnectThread to iniatiate a connection to a remote device.
+     * Start the ConnectThread to initiate a connection to a remote device.
      *
      * @param device TheBluetoothDevice to connect
      */
     public synchronized void connect(BluetoothDevice device) {
+        Log.d(TAG, "connect to: " + device);
+
         // Cancel any thread attempting to make a connection
         if (mState == STATE_CONNECTING) {
             if (mConnectThread != null) {
@@ -116,7 +129,7 @@ public abstract class BluetoothCommunicatorService implements IService{
      * @param device The BluteoothDevice that has been connected
      */
     public synchronized void connected (BluetoothSocket socket, BluetoothDevice device) {
-
+        Log.d(TAG, "Securely connected");
         // Cancel the THread that completed the connection
         if (mConnectThread != null) {
             mConnectThread.cancel();
@@ -138,6 +151,10 @@ public abstract class BluetoothCommunicatorService implements IService{
         // Start the thread to manage the connection and perform transmissions
         mConnectedThread = new ConnectedThread(socket);
         mConnectedThread.start();
+        Message msg = mHandler.obtainMessage(Constants.MESSAGE_DEVICE_NAME);
+        Bundle bundle = new Bundle();
+        bundle.putString(Constants.DEVICE_NAME, device.getName());
+        msg.setData(bundle);
 
         setState(STATE_CONNECTED);
     }
@@ -147,6 +164,7 @@ public abstract class BluetoothCommunicatorService implements IService{
      */
     @Override
     public synchronized void stop() {
+        Log.d(TAG, "stop");
         if (mConnectThread != null) {
             mConnectThread.cancel();
             mConnectThread = null;
@@ -159,6 +177,7 @@ public abstract class BluetoothCommunicatorService implements IService{
             mSecureAcceptThread.cancel();
             mSecureAcceptThread = null;
         }
+        setState(STATE_NONE);
     }
 
     /**
@@ -182,6 +201,13 @@ public abstract class BluetoothCommunicatorService implements IService{
      *  Indicate that the ocnnection attempt failed
      */
     private void connectionFailed() {
+        // send a Failure message back to the activity
+        Message msg = mHandler.obtainMessage(Constants.MESSAGE_TOAST);
+        Bundle bundle = new Bundle();
+        bundle.putString(Constants.TOAST, "Unable to connect device");
+        msg.setData(bundle);
+        mHandler.sendMessage(msg);
+
         // Start the service over to restart listening mode
         BluetoothCommunicatorService.this.start();
     }
@@ -189,6 +215,10 @@ public abstract class BluetoothCommunicatorService implements IService{
      * Indicate that the connection was lost
      */
     private void connectionLost() {
+        Message msg = mHandler.obtainMessage(Constants.MESSAGE_TOAST);
+        Bundle bundle = new Bundle();
+        bundle.putString(Constants.TOAST, "Device connection was lost");
+        msg.setData(bundle);
         // Start the service over to restart listening mode
         BluetoothCommunicatorService.this.start();
     }
@@ -209,11 +239,13 @@ public abstract class BluetoothCommunicatorService implements IService{
             try{
                 tmp = mAdapter.listenUsingRfcommWithServiceRecord(NAME_SECURE, MY_UUID_SECURE);
             } catch (IOException e) {
-                //
+                Log.e(TAG, "Socket type: Secure listen() failed", e);
             }
             mmServerSocket = tmp;
         }
         public void run() {
+            Log.d(TAG, "Socket type: Secure begin mAcceptThread " + this);
+
             setName("AcceptThread" + SOCKET_TYPE);
             BluetoothSocket socket = null;
             // listen to the server socket if we're not connected
@@ -223,7 +255,7 @@ public abstract class BluetoothCommunicatorService implements IService{
                     // successful connection or an exception
                     socket = mmServerSocket.accept();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    Log.e(TAG, "Socket type: Secure accept() failed", e);
                     break;
                 }
 
@@ -241,19 +273,21 @@ public abstract class BluetoothCommunicatorService implements IService{
                                 try {
                                     socket.close();
                                 } catch (IOException e) {
-                                    e.printStackTrace();
+                                    Log.e(TAG, "Could not close unwanted socket", e);
                                 }
                                 break;
                         }
                     }
                 }
             }
+            Log.i(TAG, "END mAcceptThread, socket type Secure");
         }
+
         public void cancel() {
+            Log.d(TAG, "Socket type Secure: Cancel " + this);
             try {
                 mmServerSocket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
+            } catch (IOException e) { Log.e(TAG, "Close() of server failed", e);
             }
         }
     }
@@ -275,17 +309,18 @@ public abstract class BluetoothCommunicatorService implements IService{
             try {
                 tmp = device.createRfcommSocketToServiceRecord(MY_UUID_SECURE);
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.e(TAG, "secure socket create() failed", e);
             }
             mmSocket = tmp;
         }
 
         public void run() {
+
+            Log.d(TAG, "BEGIN mConnectThread Secure socket");
             setName("ConnectThread" + SOCKET_TYPE);
 
             // Always cancel discovery because it will slow down a connection
-            // We dont do discovery. It's the server who starts the connection
-            // mAdapter.cancelDiscovery();
+            //mAdapter.cancelDiscovery();
 
             // Make a connection to the BluetoothSocket
             try {
@@ -296,7 +331,7 @@ public abstract class BluetoothCommunicatorService implements IService{
                 try {
                     mmSocket.close();
                 } catch (IOException e1) {
-                    e1.printStackTrace();
+                    Log.e(TAG, "unable to close() secure socket during connection failure", e);
                 }
                 connectionFailed();
                 return;
@@ -313,7 +348,7 @@ public abstract class BluetoothCommunicatorService implements IService{
             try {
                 mmSocket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.e(TAG, "close of connect to secure socket failed", e);
             }
         }
     }
@@ -328,6 +363,7 @@ public abstract class BluetoothCommunicatorService implements IService{
         private final OutputStream mmOutputStream;
 
         public ConnectedThread (BluetoothSocket socket) {
+            Log.d(TAG, "Create connectedThread");
             mmSocket = socket;
             InputStream tmpIn = null;
             OutputStream tmpOut = null;
@@ -337,13 +373,16 @@ public abstract class BluetoothCommunicatorService implements IService{
                 tmpIn = socket.getInputStream();
                 tmpOut = socket.getOutputStream();
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.e(TAG, "temp sockets not created", e);
             }
             mmInStream = tmpIn;
             mmOutputStream = tmpOut;
+            if(tmpOut != null)
+                init();
         }
 
         public void run() {
+            Log.i(TAG, "BEGIN mConnectedThread");
             byte[] buffer = new byte[1024];
             int bytes;
 
@@ -351,12 +390,13 @@ public abstract class BluetoothCommunicatorService implements IService{
             while (mState == STATE_CONNECTED) {
                 try {
                     bytes = mmInStream.read(buffer);
-                    receive(buffer);
+
+                    mHandler.obtainMessage(Constants.MESSAGE_FROM_SERVER, bytes, -1, buffer).sendToTarget();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    Log.e(TAG, "===== [disconnected] ======", e);
                     connectionLost();
                     // Start the service over to restart listening mode
-                    BluetoothCommunicatorService.this.start();
+                    BluetoothCommunicatorService.this.start(); // TODO - Quero é começar a ligaçao novamente
                     break;
                 }
             }
@@ -366,7 +406,7 @@ public abstract class BluetoothCommunicatorService implements IService{
             try {
                 mmOutputStream.write(buffer);
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.e(TAG, "Exception during write", e);
             }
         }
 
@@ -374,10 +414,12 @@ public abstract class BluetoothCommunicatorService implements IService{
             try {
                 mmSocket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.e(TAG, "close() of connect socket failed", e);
             }
         }
     }
+
+    protected abstract void init();
 
 
 }
