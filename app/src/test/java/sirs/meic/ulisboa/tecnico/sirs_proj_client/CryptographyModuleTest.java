@@ -16,7 +16,7 @@ public class CryptographyModuleTest {
 
     // Deviation function
     @Test (expected = IllegalArgumentException.class)
-    public void generateHash_NullArgs0_ThrowException() throws Exception {
+    public void applyPBKDeviation_NullArgs0_ThrowException() throws Exception {
         String username = null;
         String password = null;
         CryptographyModule sc = new CryptographyModule();
@@ -24,7 +24,7 @@ public class CryptographyModuleTest {
     }
 
     @Test (expected = IllegalArgumentException.class)
-    public void generateHash_NullArgs1_ThrowException() throws Exception {
+    public void applyPBKDeviation_NullArgs1_ThrowException() throws Exception {
         String username = "HelloWorld";
         String password = null;
         CryptographyModule sc = new CryptographyModule();
@@ -32,7 +32,7 @@ public class CryptographyModuleTest {
     }
 
     @Test (expected = IllegalArgumentException.class)
-    public void generateHash_NullArgs2_ThrowException() throws Exception {
+    public void applyPBKDeviation_NullArgs2_ThrowException() throws Exception {
         String username = null;
         String password = "ThisIsAPassword";
         CryptographyModule sc = new CryptographyModule();
@@ -40,7 +40,7 @@ public class CryptographyModuleTest {
     }
 
     @Test (expected = IllegalArgumentException.class)
-    public void generateHash_EmptyUsername_ThrowException() throws Exception {
+    public void applyPBKDeviation_EmptyUsername_ThrowException() throws Exception {
         String username = "";
         String password = "ThisIsAPassword";
         CryptographyModule sc = new CryptographyModule();
@@ -49,7 +49,7 @@ public class CryptographyModuleTest {
 
     // Online pbkdf2 : http://www.neurotechnics.com/tools/pbkdf2
     @Test
-    public void generateHashHex_Success0_returnsTrue() throws Exception {
+    public void applyPBKDeviation_Success0_returnsTrue() throws Exception {
         String username = "catarina";
         String password = "catarina";
         String resultFor100Iterations = "9f1af7f457b93e87fc685e535994904e22afcfc7c890a035adf94b2ebd360804";
@@ -58,7 +58,7 @@ public class CryptographyModuleTest {
     }
 
     @Test
-    public void generateHashHex_Success1_returnsTrue() throws Exception {
+    public void applyPBKDeviation_Success1_returnsTrue() throws Exception {
         String username = "catarina";
         String password = "password";
         String resultFor100Iterations = "7bc857474ca037e6b7e9aea8f20775ea74bef7722572667d487d833a80bcc5bf";

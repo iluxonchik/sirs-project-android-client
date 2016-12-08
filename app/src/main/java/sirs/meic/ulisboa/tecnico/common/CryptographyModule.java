@@ -73,8 +73,8 @@ public class CryptographyModule {
     final public static String SECRET_KEY__PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256";
     final public static String SECRET_KEY_ALGORITHM = "AES/CBC/PKCS5Padding";
 
-    final public static BigInteger DH_PUBLIC_VALUE_P = BigInteger.valueOf(1234567890);
-    final public static BigInteger DH_PUBLIC_VALUE_G = BigInteger.valueOf(1234567890);
+    final public static BigInteger DH_PUBLIC_VALUE_P = new BigInteger("1234567890", 16);
+    final public static BigInteger DH_PUBLIC_VALUE_G = new BigInteger("1234567890", 16);
 
     private byte[] secretKey;
     private int counter; // used as IV, to ensure freshness
@@ -84,6 +84,7 @@ public class CryptographyModule {
     private Key receivedPublicKey;
 
     public CryptographyModule() {
+
         counter = 0;
         generateDHKeys();
     }
