@@ -16,6 +16,8 @@ import java.util.UUID;
 
 import javax.crypto.KeyGenerator;
 
+import sirs.meic.ulisboa.tecnico.sirs_proj_client.MainActivity;
+
 /**
  * Created by Belem on 03/12/2016.
  */
@@ -28,8 +30,8 @@ public abstract class BluetoothCommunicatorService implements IService{
     private static final String SOCKET_TYPE = "Secure";
 
     // Unique UUID for this application
-    private static final String NAME_SECURE = "BluetoothFileCipheringSecure";
-    private static final UUID MY_UUID_SECURE = UUID.randomUUID();
+    private static final String NAME_SECURE = "SIRSService";
+    private static final UUID MY_UUID_SECURE = UUID.fromString("94f39d29-7d6d-437d-973b-fba39e49d4ee");
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;         // we're doing nothing
@@ -111,11 +113,13 @@ public abstract class BluetoothCommunicatorService implements IService{
                 mConnectThread = null;
             }
         }
+        Log.d(TAG, "connect 22: ");
         // Cancel any thread currently running a connection
         if (mConnectedThread != null) {
             mConnectedThread.cancel();
             mConnectedThread = null;
         }
+        Log.d(TAG, "connect 33: ");
 
         // Start the thread to connect with the given device
         mConnectThread = new ConnectThread(device);
@@ -148,6 +152,8 @@ public abstract class BluetoothCommunicatorService implements IService{
             mSecureAcceptThread = null;
         }
 
+        setState(STATE_CONNECTED);
+        Log.d(TAG, "STATE (3): " + mState);
         // Start the thread to manage the connection and perform transmissions
         mConnectedThread = new ConnectedThread(socket);
         mConnectedThread.start();
@@ -156,7 +162,6 @@ public abstract class BluetoothCommunicatorService implements IService{
         bundle.putString(Constants.DEVICE_NAME, device.getName());
         msg.setData(bundle);
 
-        setState(STATE_CONNECTED);
     }
 
     /**
@@ -326,7 +331,10 @@ public abstract class BluetoothCommunicatorService implements IService{
             try {
                 // This is a blocking call and will only return on a
                 // successful connection or an exception
+
+                Log.d(TAG, "run mConnectThread Secure socket");
                 mmSocket.connect();
+                Log.d(TAG, "after connect mConnectThread Secure socket");
             } catch (IOException e) {
                 try {
                     mmSocket.close();
@@ -371,7 +379,10 @@ public abstract class BluetoothCommunicatorService implements IService{
             //Get tbe BluetoothSocket input and output streams
             try {
                 tmpIn = socket.getInputStream();
+                Log.d(TAG, "Create connectedThread input stream");
                 tmpOut = socket.getOutputStream();
+                Log.d(TAG, "Create connectedThread output stream");
+                MainActivity.notConnected = false;
             } catch (IOException e) {
                 Log.e(TAG, "temp sockets not created", e);
             }
@@ -385,21 +396,25 @@ public abstract class BluetoothCommunicatorService implements IService{
             Log.i(TAG, "BEGIN mConnectedThread");
             byte[] buffer = new byte[1024];
             int bytes;
-
+            Log.d(TAG, "run() listening to incoming messages: " + mState);
             // Keep listening to the InputStream while connected
+
             while (mState == STATE_CONNECTED) {
                 try {
+                    Log.i(TAG, "Received ");
                     bytes = mmInStream.read(buffer);
-
+                    receive(buffer);
                     mHandler.obtainMessage(Constants.MESSAGE_FROM_SERVER, bytes, -1, buffer).sendToTarget();
                 } catch (IOException e) {
                     Log.e(TAG, "===== [disconnected] ======", e);
                     connectionLost();
                     // Start the service over to restart listening mode
-                    BluetoothCommunicatorService.this.start(); // TODO - Quero é começar a ligaçao novamente
+                    BluetoothCommunicatorService.this.start();
                     break;
                 }
             }
+
+            Log.d(TAG, "run() listening to incoming messages: " + mState);
         }
 
         public void write(byte[] buffer) {

@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
@@ -42,6 +43,7 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyAgreement;
+import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.interfaces.DHPrivateKey;
@@ -51,6 +53,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import static android.R.attr.data;
 
 
 /**
@@ -71,22 +74,30 @@ public class CryptographyModule {
     final public static int SECRET_KEY_ALGORITHM_BLOCK_SIZE = 32;
 
     final public static String SECRET_KEY__PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256";
-    final public static String SECRET_KEY_ALGORITHM = "AES/CBC/PKCS5Padding";
+    final public static String SECRET_KEY_ALGORITHM = "AES/CBC/PKCS7Padding";
 
     final public static BigInteger DH_PUBLIC_VALUE_P = new BigInteger("1234567890", 16);
     final public static BigInteger DH_PUBLIC_VALUE_G = new BigInteger("1234567890", 16);
 
     private byte[] secretKey;
     private int counter; // used as IV, to ensure freshness
+    private int incomingCounter;
 
     private Key DHPrivateKey;
     private Key DHPublicKey;
     private Key receivedPublicKey;
 
     public CryptographyModule() {
-
         counter = 0;
-        generateDHKeys();
+        incomingCounter = 0;
+        MessageDigest digest = null;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+            secretKey = digest.digest("Diffie-Hellman negotiated key".getBytes());
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        //generateDHKeys();
     }
 
     private byte[] getKeyEncoded(Key key) {
@@ -107,6 +118,8 @@ public class CryptographyModule {
         SecretKeyFactory skf = SecretKeyFactory.getInstance(SECRET_KEY__PBKDF2_ALGORITHM);
         return skf.generateSecret(pbeKeySpec).getEncoded();
     }
+    public void incrCounter() { counter++;}
+
     public byte[] cipher(byte[] aBytes) throws InvalidKeyException {
         if (secretKey == null)
             throw new InvalidKeyException("SecretKey is undefined");
@@ -131,8 +144,6 @@ public class CryptographyModule {
 
             byteOutStream = new ByteArrayOutputStream();
             byteOutStream.write(aBytes);
-            byteOutStream.write(counter);
-            counter ++;
             byte[] plainBytes = byteOutStream.toByteArray();
 
             Cipher cipher = Cipher.getInstance(SECRET_KEY_ALGORITHM);
@@ -163,14 +174,14 @@ public class CryptographyModule {
             return cipheredBytes;
         }
     }
-    public byte[] decipher(byte[] aBytes) throws InvalidKeyException{
+    public byte[] decipher(byte[] aBytes, byte[] iv) throws InvalidKeyException{
         if (secretKey == null)
             throw new InvalidKeyException("SecretKey is undefined");
 
         final SecretKeySpec keySpec = new SecretKeySpec(secretKey, "AES");
-        return decipherAES(aBytes, keySpec);
+        return decipherAES(aBytes, keySpec, iv);
     }
-    public byte[] decipherAES(byte[] aBytes, Key aKey) throws InvalidKeyException {
+    public byte[] decipherAES(byte[] aBytes, Key aKey, byte[] iv) throws InvalidKeyException {
         if(aKey == null)
             throw new IllegalArgumentException(new NullPointerException("provided key is undefined."));
 
@@ -179,7 +190,7 @@ public class CryptographyModule {
         Cipher cipher = null;
         try {
             cipher = Cipher.getInstance(SECRET_KEY_ALGORITHM);
-            cipher.init(Cipher.DECRYPT_MODE, aKey, new IvParameterSpec(getInitVector()));
+            cipher.init(Cipher.DECRYPT_MODE, aKey, new IvParameterSpec(iv));
             plainBytes = cipher.doFinal(aBytes);
 
         } catch (NoSuchAlgorithmException e) {
@@ -258,12 +269,15 @@ public class CryptographyModule {
             Log.e(TAG, "generateDHCommonSecretKey() Could not generate DH common session key exception", e);
         }
     }
-    public byte[] hash(byte[] aBytes) throws NoSuchAlgorithmException {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        return digest.digest(aBytes);
+    public byte[] hmac(byte[] aBytes) throws NoSuchAlgorithmException, InvalidKeyException, InvalidKeySpecException {
+        Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
+        SecretKeySpec secret_key = new SecretKeySpec(secretKey, "HmacSHA256");
+        sha256_HMAC.init(secret_key);
+        byte[] hmac = sha256_HMAC.doFinal(aBytes);
+        return hmac;
     }
 
-    public byte[] getInitVector() {return ByteBuffer.allocate(16).putInt(counter).array(); }
+    public byte[] getInitVector() {return String.format("%016d", counter).getBytes(); }
     public byte[] getDHPublicKeyEncoded() {
         return DHPublicKey.getEncoded();
     }
@@ -298,14 +312,17 @@ public class CryptographyModule {
         return null;
     }
 
-    public boolean isNonceValid(byte[] nonce) {
-        byte[] byteArray = Ints.toByteArray(counter);
-        if (Arrays.equals(nonce, byteArray)) {
-            counter++;
-            Log.d(TAG, "Nonce " + counter + " is valid");
+    public boolean isNonceValid(byte[] nonce) throws InvalidKeySpecException, NoSuchAlgorithmException, IOException {
+
+        String nonc = new String(getEncodingHex(nonce));
+
+        Log.d(TAG, "Nonce " + nonc );
+        if (nonc.equals(getEncodingHex(String.format("%016d", incomingCounter).getBytes()))) {
+            Log.d(TAG, "Nonce " + nonc + " is valid");
+            incomingCounter++;
             return true;
         } else {
-            Log.d(TAG, "Invalid nonce " + counter);
+            Log.d(TAG, "Invalid nonce " + nonc + "\nExpected: " + getEncodingHex(String.format("%016d", incomingCounter).getBytes()));
             return false;
         }
     }
@@ -376,9 +393,10 @@ public class CryptographyModule {
 
     }
 
-    public boolean verifyMAC(byte[] originalMsg, byte[] sentDigest) throws NoSuchAlgorithmException {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        byte[] orignalMAC = digest.digest(originalMsg);
-        return Arrays.equals(originalMsg, sentDigest);
+    public boolean verifyMAC(byte[] originalMsg, byte[] sentDigest) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException {
+        byte[] originalMAC = hmac(originalMsg);
+
+        Log.d(TAG, "validateMessage() ---- " + getEncodingHex(originalMAC));
+        return Arrays.equals(originalMAC, sentDigest);
     }
 }

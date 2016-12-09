@@ -39,6 +39,8 @@ public class MainActivity extends AppCompatActivity {
 
     private String mConnectedDevice = null;
 
+    public static boolean notConnected = true;
+
     /**
      * Local Bluetooth Adapter
      */
@@ -62,7 +64,6 @@ public class MainActivity extends AppCompatActivity {
         if (mBluetoothAdapter == null) {
             makeText(this, R.string.bt_not_enabled_leaving, LENGTH_SHORT).show();
             this.finish();
-
         }
 
         bLogin.setOnClickListener( new View.OnClickListener() {
@@ -172,14 +173,15 @@ public class MainActivity extends AppCompatActivity {
                     makeText(this, R.string.bt_not_enabled_leaving, LENGTH_SHORT).show();
                     this.finish();
                 }
-
         }
     }
 
     private void setUpService() {
         Log.d(TAG, "setUpService()");
         mFileCipheringService = new BluetoothFileCipheringService(mHandler);
-        connectDevice(Constants.BT_ADDRESS_SONY_XPERIA);
+        //while(notConnected) {
+            connectDevice(Constants.BT_ADDRESS_SAMSUNG_ILLYA);
+        //}
         /*try {
             mFileCipheringService.login(null, null);
             makeText(this, "No need for login. Already had a token", Toast.LENGTH_SHORT).show();
@@ -201,13 +203,15 @@ public class MainActivity extends AppCompatActivity {
                     switch(msg.arg1) {
                         case BluetoothFileCipheringService.STATE_CONNECTED:
                             Toast.makeText(MainActivity.this, "Connected", Toast.LENGTH_SHORT).show();
+                            Log.d(TAG, "==================================================================================================================D");
+                            notConnected = false;
                             break;
                         case BluetoothCommunicatorService.STATE_CONNECTING:
                             Toast.makeText(MainActivity.this, "Connecting", Toast.LENGTH_SHORT).show();
                             break;
                         case BluetoothCommunicatorService.STATE_LISTEN:
                         case BluetoothCommunicatorService.STATE_NONE:
-                            Toast.makeText(MainActivity.this, "Not connected", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "Not notConnected", Toast.LENGTH_SHORT).show();
                             break;
                     }
                     break;
@@ -216,6 +220,10 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 case Constants.MESSAGE_TOAST:
                     Toast.makeText(MainActivity.this, msg.getData().getString(Constants.TOAST), Toast.LENGTH_SHORT).show();
+                    break;
+                case Constants.MESSAGE_FROM_SERVER:
+                    Toast.makeText(MainActivity.this, "Received Msg from server", Toast.LENGTH_SHORT).show();
+
             };
         }
     };
@@ -226,7 +234,7 @@ public class MainActivity extends AppCompatActivity {
             BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(aDeviceAddress);
             Log.d(TAG, "connectDevice() " + aDeviceAddress + ". Connecting");
             mFileCipheringService.connect(device);
-            Log.d(TAG, "connectDevice() " + aDeviceAddress + ".Already connected");
+            Log.d(TAG, "connectDevice() " + aDeviceAddress + ". After trying to connect");
         }
         else {
             Toast.makeText(this, "setUpService() BT_ADDR: " + aDeviceAddress + " not valid", Toast.LENGTH_SHORT).show();
