@@ -27,7 +27,7 @@ import static org.junit.Assert.assertThat;
 public class CryptographyModuleTest {
 
     // Deviation function
-    @Test (expected = IllegalArgumentException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void applyPBKDeviation_NullArgs0_ThrowException() throws Exception {
         String username = null;
         String password = null;
@@ -35,7 +35,7 @@ public class CryptographyModuleTest {
         sc.getEncodingBase64(sc.applyPBKDeviation(username, password));
     }
 
-    @Test (expected = IllegalArgumentException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void applyPBKDeviation_NullArgs1_ThrowException() throws Exception {
         String username = "HelloWorld";
         String password = null;
@@ -43,7 +43,7 @@ public class CryptographyModuleTest {
         sc.getEncodingBase64(sc.applyPBKDeviation(username, password));
     }
 
-    @Test (expected = IllegalArgumentException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void applyPBKDeviation_NullArgs2_ThrowException() throws Exception {
         String username = null;
         String password = "ThisIsAPassword";
@@ -51,7 +51,7 @@ public class CryptographyModuleTest {
         sc.getEncodingBase64(sc.applyPBKDeviation(username, password));
     }
 
-    @Test (expected = IllegalArgumentException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void applyPBKDeviation_EmptyUsername_ThrowException() throws Exception {
         String username = "";
         String password = "ThisIsAPassword";
@@ -81,7 +81,7 @@ public class CryptographyModuleTest {
     @Test
     public void verifyCipherDecipher_NotEqualsResult() throws InvalidKeyException, InvalidKeySpecException, NoSuchAlgorithmException, UnsupportedEncodingException {
         byte[] plainText = "QueroEncriptarIsto".getBytes("UTF-8");
-         CryptographyModule cm = new CryptographyModule();
+        CryptographyModule cm = new CryptographyModule();
         byte[] result = cm.cipher(plainText);
 
         assertThat(Arrays.equals(result, cm.decipher(result, cm.getInitVector())), is(false));
@@ -100,19 +100,8 @@ public class CryptographyModuleTest {
     public void verifyCipher_Success1() throws IOException, InvalidKeyException, InvalidKeySpecException, NoSuchAlgorithmException {
         String cifra = "1A012F28FAA5F80327120F052A57F5141273CF0910DD3CEC233EB84B9802EBD30B293B01030C396F2F45F7989F3E35F469EB39A8F1E1306506712EF0FE4DA1CC";
         CryptographyModule cm = new CryptographyModule();
-        String resultHexa = cm.getEncodingHex( cm.decipher(cifra.getBytes(), cm.getInitVector()));
+        String resultHexa = cm.getEncodingHex(cm.decipher(cifra.getBytes(), cm.getInitVector()));
         assertEquals(resultHexa, "746F6B5F6E6577834146AEF05EB4BB02A66E739D089EDED96C66376277307760BF647ED140E1CF69748CBF38A72900D07D379112C160B5");
-
-    }
-
-    @Test
-    public void verifyMac_Success1() throws IOException, NoSuchAlgorithmException, InvalidKeyException, InvalidKeySpecException {
-        String hmac_enviado = "CB781A66DE6B8816E73D93EFD993EB920F9001D8B4B6DBB1318EA7BDAAA8B230";
-        CryptographyModule cm = new CryptographyModule();
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        bos.write("746F6B5F6E6577834146AEF05EB4BB02A66E739D089EDED96C66376277307760BF647ED140E1CF69748CBF38A72900D07D379112C160B5".getBytes());
-        bos.write(cm.getInitVector());
-        assertThat(cm.verifyMAC(bos.toByteArray(), hmac_enviado.getBytes()), is(true));
 
     }
 }

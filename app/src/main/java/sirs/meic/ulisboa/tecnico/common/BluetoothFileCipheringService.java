@@ -34,6 +34,7 @@ public class BluetoothFileCipheringService extends BluetoothCommunicatorService 
     private static final String PWD_LOGIN_ERR = "log_err";
     private static final String NO_USR_ERR = "usr_err";
 
+    private boolean receivedServerDHKey = false;
     private CryptographyModule cryptoModule;
     private TokensManager tManager;
     private String username;
@@ -61,7 +62,9 @@ public class BluetoothFileCipheringService extends BluetoothCommunicatorService 
     }
 
     public void init (){
-        /*byte[] dhPublicKey = cryptoModule.signRSAPrivateKey(cryptoModule.getDHPublicKeyEncoded());
+
+        /*
+        byte[] dhPublicKey = cryptoModule.signRSAPrivateKey(cryptoModule.getDHPublicKeyEncoded());
         try {
             write(encodeBase64inBytes(dhPublicKey));
         } catch (InvalidKeySpecException e) {
@@ -115,49 +118,55 @@ public class BluetoothFileCipheringService extends BluetoothCommunicatorService 
 
     protected void receive(byte[] aBuffer) { // TODO - RECEBER CHAVE DH
         Log.d(TAG, "received message");
-        if(aBuffer != null && aBuffer.length > 0) {
-            byte[] bytes = decodeBase64(aBuffer);
-            //Log.d(TAG, "Received request: " + bytes);
-            byte[] requestBytes =  null;
-            String request = "";
 
-            try {
-                if(validateMessage(bytes)){
-                    int requestLength = bytes.length - 16 - 32;
-                    byte[] nonce = Arrays.copyOfRange(bytes, requestLength, requestLength + 16);
-
-                    requestBytes = getDecipheredRequest(bytes, nonce);
-                    request = new String(cryptoModule.getEncodingHex(requestBytes));
-                    Log.d(TAG, "Received request: " + request);
-
-                    if (request.contains(NEW_TOKEN)) {
-                        byte[] token = Arrays.copyOfRange(requestBytes, NEW_TOKEN.length(), request.length());
-                        Log.d(TAG, "token: " + token.toString());
-                        updateToken(token, request.length());
-                        Log.d(TAG, "updated token: " );
-                    }
-                    else if (request.contains(TOKEN_WRONG_ERR) || request.contains(PWD_LOGIN_ERR)) {
-                        send(PWD_LOGIN);
-                    }
-                    else if (request.contains(NO_USR_ERR)) {
-                        send(USR_REG);
-                        try{
-                            Thread.sleep(1000 * 2); // 2s
-                        } catch (InterruptedException e) {
-                        }
-                        send(PWD_LOGIN);
-                    }
-                    else {
-                        Log.d(TAG, "REQUEST NOT RECOGNIZED");
-                    }
-                }
-            } catch (InvalidKeyException e) {Log.e(TAG, "receive() Couldn't validate msg ", e); return;
-            } catch (IOException e) {Log.e(TAG, "receive() Couldn't validate msg", e); return;
-            } catch (NoSuchAlgorithmException e) {Log.e(TAG, "receive() Couldn't validate msg ", e); return;
-            } catch (InvalidKeySpecException e) {Log.e(TAG, "receive() Couldn't validate msg ", e); return;
-            }
+        if(receivedServerDHKey == false) {
 
         }
+        else {
+            if(aBuffer != null && aBuffer.length > 0) {
+                byte[] bytes = decodeBase64(aBuffer);
+                //Log.d(TAG, "Received request: " + bytes);
+                byte[] requestBytes =  null;
+                String request = "";
+
+                try {
+                    if(validateMessage(bytes)){
+                        int requestLength = bytes.length - 16 - 32;
+                        byte[] nonce = Arrays.copyOfRange(bytes, requestLength, requestLength + 16);
+
+                        requestBytes = getDecipheredRequest(bytes, nonce);
+                        request = new String(cryptoModule.getEncodingHex(requestBytes));
+                        Log.d(TAG, "Received request: " + request);
+
+                        if (request.contains(NEW_TOKEN)) {
+                            byte[] token = Arrays.copyOfRange(requestBytes, NEW_TOKEN.length(), request.length());
+                            Log.d(TAG, "token: " + token.toString());
+                            updateToken(token, request.length());
+                            Log.d(TAG, "updated token: " );
+                        }
+                        else if (request.contains(TOKEN_WRONG_ERR) || request.contains(PWD_LOGIN_ERR)) {
+                            send(PWD_LOGIN);
+                        }
+                        else if (request.contains(NO_USR_ERR)) {
+                            send(USR_REG);
+                            try{
+                                Thread.sleep(1000 * 2); // 2s
+                            } catch (InterruptedException e) {
+                            }
+                            send(PWD_LOGIN);
+                        }
+                        else {
+                            Log.d(TAG, "REQUEST NOT RECOGNIZED");
+                        }
+                    }
+                } catch (InvalidKeyException e) {Log.e(TAG, "receive() Couldn't validate msg ", e); return;
+                } catch (IOException e) {Log.e(TAG, "receive() Couldn't validate msg", e); return;
+                } catch (NoSuchAlgorithmException e) {Log.e(TAG, "receive() Couldn't validate msg ", e); return;
+                } catch (InvalidKeySpecException e) {Log.e(TAG, "receive() Couldn't validate msg ", e); return;
+                }
+            }
+        }
+
     }
 
     private boolean validateMessage(byte[] bytes) throws InvalidKeyException, IOException, NoSuchAlgorithmException, InvalidKeySpecException {

@@ -180,7 +180,7 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "setUpService()");
         mFileCipheringService = new BluetoothFileCipheringService(mHandler);
         //while(notConnected) {
-            connectDevice(Constants.BT_ADDRESS_SAMSUNG_ILLYA);
+            connectDevice(Constants.BT_ADDRESS_TO_CONNECT_TO);
         //}
         /*try {
             mFileCipheringService.login(null, null);

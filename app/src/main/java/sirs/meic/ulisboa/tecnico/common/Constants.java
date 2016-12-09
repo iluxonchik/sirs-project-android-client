@@ -17,5 +17,5 @@ public interface Constants {
 
     public static final String BT_ADDRESS_ZTE_A75 = "4C:CB:F5:BA:AE:22";
     public static final String BT_ADDRESS_SONY_XPERIA = "20:54:76:BB:8E:FD";
-    public static final String BT_ADDRESS_SAMSUNG_ILLYA = "24:0A:64:91:D4:D0";;
+    public static final String BT_ADDRESS_TO_CONNECT_TO = "24:0A:64:91:D4:D0";;
 }
