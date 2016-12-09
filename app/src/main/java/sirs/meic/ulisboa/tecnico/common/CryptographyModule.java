@@ -74,7 +74,7 @@ public class CryptographyModule {
     final public static int SECRET_KEY_ALGORITHM_BLOCK_SIZE = 32;
 
     final public static String SECRET_KEY__PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256";
-    final public static String SECRET_KEY_ALGORITHM = "AES/CBC/PKCS7Padding";
+    final public static String SECRET_KEY_ALGORITHM = "AES/CBC/PKCS5Padding";
 
     final public static BigInteger DH_PUBLIC_VALUE_P = new BigInteger("1234567890", 16);
     final public static BigInteger DH_PUBLIC_VALUE_G = new BigInteger("1234567890", 16);
@@ -124,8 +124,8 @@ public class CryptographyModule {
         if (secretKey == null)
             throw new InvalidKeyException("SecretKey is undefined");
 
-        final SecretKeySpec keySpec = new SecretKeySpec(secretKey, "AES");
-        return cipherAES(aBytes, keySpec);
+        SecretKeySpec skeySpec = new SecretKeySpec(secretKey, 0, secretKey.length, "AES");
+        return cipherAES(aBytes, skeySpec);
     }
     public byte[] cipherDH(byte[] aBytes) throws InvalidKeyException {
         if (secretKey == null)
@@ -141,14 +141,9 @@ public class CryptographyModule {
         ByteArrayOutputStream byteOutStream = null;
 
         try {
-
-            byteOutStream = new ByteArrayOutputStream();
-            byteOutStream.write(aBytes);
-            byte[] plainBytes = byteOutStream.toByteArray();
-
             Cipher cipher = Cipher.getInstance(SECRET_KEY_ALGORITHM);
             cipher.init(Cipher.ENCRYPT_MODE, aKey, new IvParameterSpec(getInitVector()));
-            cipheredBytes = cipher.doFinal(plainBytes);
+            cipheredBytes = cipher.doFinal(aBytes);
 
         }  catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
@@ -161,8 +156,6 @@ public class CryptographyModule {
         } catch (InvalidAlgorithmParameterException e) {
             e.printStackTrace();
         } catch (InvalidKeyException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
             e.printStackTrace();
         } finally {
             if(byteOutStream != null)
@@ -178,7 +171,7 @@ public class CryptographyModule {
         if (secretKey == null)
             throw new InvalidKeyException("SecretKey is undefined");
 
-        final SecretKeySpec keySpec = new SecretKeySpec(secretKey, "AES");
+        SecretKeySpec keySpec = new SecretKeySpec(secretKey, 0, secretKey.length, "AES");
         return decipherAES(aBytes, keySpec, iv);
     }
     public byte[] decipherAES(byte[] aBytes, Key aKey, byte[] iv) throws InvalidKeyException {
